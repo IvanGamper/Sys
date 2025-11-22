@@ -1,0 +1,5 @@
+streamlit==1.39.0
+pandas==2.2.3
+bcrypt==4.2.0
+tinydb==4.8.2
+python-dotenv==1.0.1
