@@ -1,18 +1,14 @@
-# system.py
-"""
-Fitness Galerie-App (auf Basis deines Ticket-Systems)
-- TinyDB für Metadaten (data/exercises.json)
-- Medien: data/media/ (lokale Uploads) oder externe URLs
-- Keine Authentifizierung (kein Login)
-- Seiten: Galerie (Dashboard), Verwaltung (Upload / Bearbeiten / Löschen)
-
-Hinweis: Lege requirements.txt im Repo-Root mit mindestens:
-streamlit==1.39.0
-tinydb==4.8.2
-pandas==2.2.3
-python-dotenv==1.0.1
-
-"""
+# Fitness Galerie-App (auf Basis deines Ticket-Systems)
+# - TinyDB für Metadaten (data/exercises.json)
+# - Medien: data/media/ (lokale Uploads) oder externe URLs
+# - Keine Authentifizierung (kein Login)
+# - Seiten: Galerie (Dashboard), Verwaltung (Upload / Bearbeiten / Löschen)
+#
+# Hinweis: Lege requirements.txt im Repo-Root mit mindestens:
+# streamlit==1.39.0
+# tinydb==4.8.2
+# pandas==2.2.3
+# python-dotenv==1.0.1
 
 import os
 import uuid
@@ -75,18 +71,18 @@ def is_youtube_url(url: str) -> bool:
 
 
 def media_is_image(path_or_url: str) -> bool:
-    if path_or_url.startswith("http"):
-        _, ext = os.path.splitext(path_or_url.split('?')[0])
-    else:
-        _, ext = os.path.splitext(path_or_url)
+    if not path_or_url:
+        return False
+    p = path_or_url.split('?')[0]
+    _, ext = os.path.splitext(p)
     return ext.lower() in IMAGE_EXT
 
 
 def media_is_video(path_or_url: str) -> bool:
-    if path_or_url.startswith("http"):
-        _, ext = os.path.splitext(path_or_url.split('?')[0])
-    else:
-        _, ext = os.path.splitext(path_or_url)
+    if not path_or_url:
+        return False
+    p = path_or_url.split('?')[0]
+    _, ext = os.path.splitext(p)
     return ext.lower() in VIDEO_EXT or is_youtube_url(path_or_url)
 
 # --------------------
@@ -114,19 +110,21 @@ class GalleryDB:
         return self.table.insert(doc)
 
     def list_exercises(self, archived: bool = False) -> List[Dict[str, Any]]:
-        rows = self.table.all()
-        res = []
-        for r in rows:
-            if archived and r.get("archived", 0) == 1:
-                res.append(r)
-            elif not archived and r.get("archived", 0) == 0:
-                res.append(r)
-        # sort newest first
+        res: List[Dict[str, Any]] = []
+        for item in self.table:
+            # item ist ein TinyDB Document mit .doc_id
+            doc = dict(item)
+            # doc_id anhängen für einfache Handhabung in UI
+            doc["id"] = item.doc_id
+            if archived and doc.get("archived", 0) == 1:
+                res.append(doc)
+            elif not archived and doc.get("archived", 0) == 0:
+                res.append(doc)
+        # sort newest first (fallback bei fehlendem updated_at)
         res.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
         return res
 
     def get(self, doc_id: int) -> Optional[Dict[str, Any]]:
-        # TinyDB stores doc_id in .doc_id attribute of Document
         for item in self.table:
             if item.doc_id == doc_id:
                 d = dict(item)
@@ -143,13 +141,17 @@ class GalleryDB:
         item = self.get(doc_id)
         if not item:
             return
-        media = item.get("media_url", "")
-        # If media is a local path inside MEDIA_DIR, remove it
-        if media and os.path.commonpath([os.path.abspath(media), os.path.abspath(MEDIA_DIR)]) == os.path.abspath(MEDIA_DIR):
-            try:
-                os.remove(media)
-            except Exception:
-                pass
+        media = item.get("media_url", "") or ""
+        # Nur lokale Dateien löschen (URLs überspringen)
+        try:
+            if media and not media.lower().startswith("http"):
+                abs_media = os.path.abspath(media)
+                abs_media_dir = os.path.abspath(MEDIA_DIR)
+                if abs_media.startswith(abs_media_dir) and os.path.exists(abs_media):
+                    os.remove(abs_media)
+        except Exception:
+            # Fehler beim Löschen ignorieren (optional: logging)
+            pass
         self.table.remove(doc_ids=[doc_id])
 
     def toggle_archive(self, doc_id: int):
@@ -172,7 +174,7 @@ def show_gallery(search: str = "", category: Optional[str] = None, show_archived
 
     if search:
         s = search.lower()
-        exercises = [e for e in exercises if s in (e.get("title","") + " " + e.get("description","" )).lower()]
+        exercises = [e for e in exercises if s in (e.get("title", "") + " " + e.get("description", "")).lower()]
     if category and category != "Alle":
         exercises = [e for e in exercises if e.get("category") == category]
 
@@ -185,20 +187,21 @@ def show_gallery(search: str = "", category: Optional[str] = None, show_archived
     for idx, ex in enumerate(exercises):
         col = cols[idx % 3]
         with col:
-            st.markdown(f"### {ex.get('title')}
-                        **{ex.get('category','-')}**")
+            st.markdown(f"### {ex.get('title','-')}\n**{ex.get('category','-')}**")
+
             if ex.get("media_type") == "image":
                 try:
                     st.image(ex.get("media_url"), use_column_width=True)
                 except Exception:
                     st.caption("Bild konnte nicht geladen werden.")
-                else:  # video
-                    try:
-                        st.video(ex.get("media_url"))
-                    except Exception:
-                        # fallback: show link
-                        st.write(ex.get("media_url"))
-            st.write(ex.get("description",""))
+            elif ex.get("media_type") == "video":
+                try:
+                    st.video(ex.get("media_url"))
+                except Exception:
+                    # fallback: show Link
+                    st.write(ex.get("media_url"))
+
+            st.write(ex.get("description", ""))
             st.caption(f"Erstellt: {ex.get('created_at','-')}")
 
 
@@ -251,7 +254,7 @@ def page_management():
             st.info("Keine Übungen vorhanden.")
         for ex in exercises:
             with st.expander(f"{ex.get('title')} — {ex.get('category')}"):
-                st.write(ex.get('description',''))
+                st.write(ex.get('description', ''))
                 if ex.get('media_type') == 'image':
                     try:
                         st.image(ex.get('media_url'))
@@ -263,16 +266,17 @@ def page_management():
                     except Exception:
                         st.write(ex.get('media_url'))
 
-                c1, c2, c3 = st.columns([1,1,1])
-                if c1.button("✏️ Bearbeiten", key=f"edit_{ex.table._doc_id(ex)}"):
-                    st.session_state['edit_id'] = ex.table._doc_id(ex)
+                c1, c2, c3 = st.columns([1, 1, 1])
+                ex_id = ex.get('id')
+                if c1.button("✏️ Bearbeiten", key=f"edit_{ex_id}"):
+                    st.session_state['edit_id'] = ex_id
                     st.experimental_rerun()
-                if c2.button("🗑️ Löschen", key=f"del_{ex.table._doc_id(ex)}"):
-                    DB.delete(ex.table._doc_id(ex))
+                if c2.button("🗑️ Löschen", key=f"del_{ex_id}"):
+                    DB.delete(ex_id)
                     st.success("✅ Gelöscht")
                     st.experimental_rerun()
-                if c3.button("📦 Archivieren", key=f"arch_{ex.table._doc_id(ex)}"):
-                    DB.toggle_archive(ex.table._doc_id(ex))
+                if c3.button("📦 Archivieren", key=f"arch_{ex_id}"):
+                    DB.toggle_archive(ex_id)
                     st.experimental_rerun()
 
     # Bearbeiten (wenn in session)
@@ -285,9 +289,13 @@ def page_management():
         else:
             st.subheader(f"Bearbeite: {item.get('title')}")
             with st.form("edit_form"):
-                new_title = st.text_input("Titel", value=item.get('title',''))
-                new_desc = st.text_area("Beschreibung", value=item.get('description',''))
-                new_cat = st.selectbox("Kategorie", ["Alle"] + CATEGORIES, index=( ["Alle"] + CATEGORIES ).index(item.get('category') if item.get('category') in CATEGORIES else 'Sonstiges'))
+                categories_list = ["Alle"] + CATEGORIES
+                default_cat = item.get('category', 'Sonstiges')
+                default_index = categories_list.index(default_cat) if default_cat in categories_list else 0
+
+                new_title = st.text_input("Titel", value=item.get('title', ''))
+                new_desc = st.text_area("Beschreibung", value=item.get('description', ''))
+                new_cat = st.selectbox("Kategorie", categories_list, index=default_index)
 
                 media_choice = st.radio("Medienquelle", ["Beibehalten", "Neue Datei hochladen", "Neue URL"], horizontal=True)
                 new_media = item.get('media_url')
@@ -301,13 +309,13 @@ def page_management():
                         new_media_type = "video" if media_is_video(p) else "image"
                         st.success("Neue Datei gespeichert.")
                 elif media_choice == "Neue URL":
-                    url = st.text_input("Neue Media-URL", value=item.get('media_url',''))
+                    url = st.text_input("Neue Media-URL", value=item.get('media_url', ''))
                     if url:
                         new_media = url.strip()
                         new_media_type = "video" if media_is_video(new_media) else "image"
 
-                if st.form_submit_button("💾 Speichern" ):
-                    DB.update(edit_id, {"title": new_title, "description": new_desc, "category": (new_cat if new_cat!='Alle' else 'Sonstiges'), "media_url": new_media, "media_type": new_media_type})
+                if st.form_submit_button("💾 Speichern"):
+                    DB.update(edit_id, {"title": new_title, "description": new_desc, "category": (new_cat if new_cat != 'Alle' else 'Sonstiges'), "media_url": new_media, "media_type": new_media_type})
                     st.success("✅ Aktualisiert")
                     st.session_state.pop('edit_id', None)
                     st.experimental_rerun()
