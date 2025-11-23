@@ -1,5 +1,5 @@
 streamlit==1.39.0
 pandas==2.2.3
-passlib[bcrypt]==1.7.4
 tinydb==4.8.2
 python-dotenv==1.0.1
+werkzeug==3.0.3

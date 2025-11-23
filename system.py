@@ -1,5 +1,4 @@
-
-# app_nosql.py
+# app_nosql_fixed.py
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -8,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import streamlit as st
 
-from passlib.hash import bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 # TinyDB für lokale NoSQL-Variante
 try:
@@ -226,11 +226,13 @@ NOSQL = NoSqlDB()
 # --------------------
 # Utility-Functions (gleich wie vorher)
 # --------------------
-def hash_pw_bcrypt(password: str) -> str:
-    return bcrypt.hash(password)
+# Passwort verschlüsseln (werkzeug)
+def hash_pw(password: str) -> str:
+    return generate_password_hash(password)
 
-def verify_pw_bcrypt(password: str, stored_hash: str) -> bool:
-    return bcrypt.verify(password, stored_hash)
+# Passwort prüfen (werkzeug)
+def verify_pw(password: str, stored_hash: str) -> bool:
+    return check_password_hash(stored_hash, password)
 
 
 def safe_index(options, value, default=0):
@@ -316,13 +318,13 @@ class AuthService:
         u = UserRepository.get_by_username(username.strip())
         if not u:
             return None
-        if verify_pw_bcrypt(password, u.get("password_hash", "")):
+        if verify_pw(password, u.get("password_hash", "")):
             return {"id": u["id"], "username": u["username"], "role": u["role"]}
         return None
 
     @staticmethod
     def create_user(username: str, password: str, role: str = "user") -> int:
-        pw_hash = hash_pw_bcrypt(password)
+        pw_hash = hash_pw(password)
         return UserRepository.create(username, pw_hash, role)
 
 class TicketService:
@@ -579,7 +581,7 @@ class AppUI:
                              disabled=is_self or not sure or confirm != victim["username"],
                              type="primary"):
                     UserRepository.deactivate(victim["id"])
-                    st.success(f"✅ Benutzer '{victim['username']}' wurde deaktiviert.")
+                    st.success(f"✅ Benutzer '{victim["username"]}' wurde deaktiviert.")
                     st.rerun()
 
     def page_profile(self):
