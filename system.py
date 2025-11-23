@@ -11,11 +11,8 @@ import streamlit as st
 
 
 # TinyDB für lokale NoSQL-Variante
-try:
-    from tinydb import TinyDB, Query
-    from tinydb.operations import delete
-except Exception as e:
-    raise RuntimeError("Bitte installiere tinydb: pip install tinydb") from e
+from tinydb import TinyDB, Query
+
 
 # --------------------
 # Konfiguration
