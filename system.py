@@ -605,11 +605,16 @@ class AppUI:
 # --------------------
 def main():
     ui = AppUI()
-    if "user_id" not in st.session_state:
-        ui.page_login()
-        return
 
-    st.sidebar.title("🎫 Ticketsystem (NoSQL)")
+    # === LOGIN TEMPORÄR DEAKTIVIERT ===
+    # Für temporäre Tests setzen wir automatisch eine Session (Gast/Admin).
+    # Entfernen oder ändern, wenn Login wieder aktiv sein soll.
+    if "user_id" not in st.session_state:
+        st.session_state["user_id"] = 0
+        st.session_state["username"] = "guest"
+        st.session_state["role"] = "admin"  # setze zu 'user' falls du keine Admin-Rechte willst
+
+    st.sidebar.title("🎫 Ticketsystem (NoSQL) — Testmodus: Login deaktiviert")
     st.sidebar.markdown(f"**👤 Benutzer:**  {st.session_state.get('username','-')}")
     st.sidebar.markdown(f"**🛡️ Rolle:**  {st.session_state.get('role','-')}")
     st.sidebar.divider()
