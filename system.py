@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import streamlit as st
 
-from werkzeug.security import generate_password_hash, check_password_hash
+
 
 
 # TinyDB für lokale NoSQL-Variante
