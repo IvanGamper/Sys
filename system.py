@@ -8,6 +8,8 @@ import bcrypt
 import pandas as pd
 import streamlit as st
 
+from passlib.hash import bcrypt
+
 # TinyDB für lokale NoSQL-Variante
 try:
     from tinydb import TinyDB, Query
@@ -225,13 +227,11 @@ NOSQL = NoSqlDB()
 # Utility-Functions (gleich wie vorher)
 # --------------------
 def hash_pw_bcrypt(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hash(password)
 
 def verify_pw_bcrypt(password: str, stored_hash: str) -> bool:
-    try:
-        return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
-    except Exception:
-        return False
+    return bcrypt.verify(password, stored_hash)
+
 
 def safe_index(options, value, default=0):
     try:
